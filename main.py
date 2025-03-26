@@ -125,7 +125,7 @@ def gpt2_optuna_search(exp_name, n_trials=1):
     study = optuna.create_study(direction='maximize')
     study.optimize(objectivegpt2, n_trials=n_trials)
 
-    # Sauvegarder les résultats
+    # Sauvegarder les résultats # test
     results_df = study.trials_dataframe()
     results_df.to_pickle(f'out/gpt2_optuna_results_{exp_name}.pkl')
 
