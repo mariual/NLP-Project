@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score
 
 from utils.data_preparation import naive_bayes_preprocessing, bert_preprocessing,gpt2_preprocessing,roberta_preprocessing,electra_preprocessing
 from models.naive_bayes import NaiveBayes
-from models.bert import Bert
+from models.bert import Bert,DistilBert
 from models.gpt2_roberta_electra import GPT2Emotion,Roberta,Electra
 import optuna
 from transformers import ElectraForSequenceClassification, ElectraTokenizer, get_linear_schedule_with_warmup
@@ -87,6 +87,67 @@ def bert_grid_search(params, exp_name):
     results_df = pd.DataFrame(results_list)
     results_df = results_df.sort_values(by='val_accuracy', ascending=False).reset_index(drop=True)
     results_df.to_pickle(f'out/_grid_search_results_{exp_name}.pkl')
+    return results_df
+
+def distilbert_grid_search(params, exp_name):
+    """Grid search identique à la version BERT, adaptée pour DistilBERT"""
+    
+    ## Préparation des données (identique) ##
+    distilbert_processed_data, tokenizer = bert_preprocessing()  # Même fonction de preprocessing
+    input_ids_train, attention_mask_train, y_train = distilbert_processed_data['train']
+    input_ids_val, attention_mask_val, y_val = distilbert_processed_data['validation']
+    input_ids_test, attention_mask_test, y_test = distilbert_processed_data['test']
+
+    # Création des datasets (identique)
+    train_dataset = TensorDataset(input_ids_train, attention_mask_train, y_train)
+    val_dataset = TensorDataset(input_ids_val, attention_mask_val, y_val)
+    test_dataset = TensorDataset(input_ids_test, attention_mask_test, y_test)
+
+    results_list = []
+    param_combinations = itertools.product(
+        params['epochs'], 
+        params['batch_size'], 
+        params['lr'], 
+        params['weight_decay'],
+        params['fine_tune_last_layers']
+    )
+
+    for epochs, batch_size, lr, weight_decay, fine_tune_last_layers in param_combinations:
+        
+        # Chargement des données (identique)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size)
+        
+        # Seul changement: utilisation de DistilBert au lieu de Bert
+        model = DistilBert()  # Utilise notre classe DistilBert avec la même interface
+        
+        # Entraînement avec les mêmes paramètres
+        model.fit(
+            train_loader, 
+            epochs=epochs, 
+            lr=lr, 
+            weight_decay=weight_decay, 
+            fine_tune_last_layers=fine_tune_last_layers
+        )
+        
+        # Prédiction et évaluation (identique)
+        y_pred = model.predict(val_loader)
+        val_accuracy = accuracy_score(y_val, y_pred)
+
+        results_list.append({
+            'epochs': epochs,
+            'batch_size': batch_size,
+            'lr': lr,
+            'weight_decay': weight_decay,
+            'fine_tune_last_layers': fine_tune_last_layers,
+            'val_accuracy': val_accuracy
+        })
+
+    # Sauvegarde des résultats (identique)
+    results_df = pd.DataFrame(results_list)
+    results_df = results_df.sort_values(by='val_accuracy', ascending=False).reset_index(drop=True)
+    results_df.to_pickle(f'out/_grid_search_results_{exp_name}_distilbert.pkl')
+    
     return results_df
 
 
@@ -224,6 +285,22 @@ def electra_optuna_search(exp_name, n_trials=20):
 
 if __name__ == '__main__':
 
+
+    # Distillbert grid search
+    distillbert_search = True
+    print('Starting Distilbert search')
+    if distillbert_search:
+        # Paramètres type pour la grid search (identique à BERT)
+        params = {
+            'epochs': [8],
+            'batch_size': [64],
+            'lr': [2e-5],
+            'weight_decay': [0.01,0.001],
+            'fine_tune_last_layers': [True,False]
+        }
+        num_combinations = len(list(itertools.product(*params.values())))
+        print(f"The number of combinations is: {num_combinations}")
+        grid_search_results = distilbert_grid_search(params, exp_name='last_layers')
     nb_search = False
     bert_search = False
 
@@ -275,7 +352,7 @@ if __name__ == '__main__':
     
 
     # Roberta grid search
-    roberta_search = True
+    roberta_search = False
 
     if roberta_search:
         params = {
