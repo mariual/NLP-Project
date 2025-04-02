@@ -51,6 +51,7 @@ def bert_grid_search(params, exp_name):
 
     ## Data Preparation ##
     bert_processed_data, tokenizer = bert_preprocessing()
+
     input_ids_train, attention_mask_train, y_train = bert_processed_data['train']
     input_ids_val, attention_mask_val, y_val = bert_processed_data['validation']
     input_ids_test, attention_mask_test, y_test = bert_processed_data['test']
@@ -285,9 +286,15 @@ def electra_optuna_search(exp_name, n_trials=20):
 
 if __name__ == '__main__':
 
+    
+    nb_search = False
+    bert_search = True
+    gpt2_emotion_search = False
+    distillbert_search = False
+    roberta_search = False
+    electra_search = False
 
     # Distillbert grid search
-    distillbert_search = True
     print('Starting Distilbert search')
     if distillbert_search:
         # Paramètres type pour la grid search (identique à BERT)
@@ -301,8 +308,7 @@ if __name__ == '__main__':
         num_combinations = len(list(itertools.product(*params.values())))
         print(f"The number of combinations is: {num_combinations}")
         grid_search_results = distilbert_grid_search(params, exp_name='last_layers')
-    nb_search = False
-    bert_search = False
+
 
     # Naive Bayes Grid Search
     if nb_search:
@@ -320,17 +326,16 @@ if __name__ == '__main__':
     if bert_search:
         params = {
             'epochs': [3],
-            'batch_size': [32, 64, 128],
-            'lr': [1e-5, 2e-5, 3e-5],
+            'batch_size': [32, 64],
+            'lr': [2e-5, 3e-5],
             'weight_decay': [0.01, 0.001],
             'fine_tune_last_layers': [True]
         }
         num_combinations = len(list(itertools.product(*params.values())))
         print(f"The number of combinations is: {num_combinations}")
         grid_search_results = bert_grid_search(params, exp_name='last_layers')
+    
     # GPT2 grid search
-    gpt2_emotion_search = False
-
     logging.info("Starting ELECTRA search")
         
     if gpt2_emotion_search:
@@ -352,8 +357,6 @@ if __name__ == '__main__':
     
 
     # Roberta grid search
-    roberta_search = False
-
     if roberta_search:
         params = {
             'epochs': [3,5,10],#
@@ -368,7 +371,6 @@ if __name__ == '__main__':
         print(grid_search_results.head())
 
     # Electra grid search
-    electra_search = False
     logging.info("Starting ELECTRA search")
 
     if electra_search:

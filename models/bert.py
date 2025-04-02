@@ -1,6 +1,7 @@
 import torch
 from torch.optim import AdamW
 from transformers import BertForSequenceClassification,AutoModelForSequenceClassification, get_linear_schedule_with_warmup
+from transformers import AutoTokenizer
 from tqdm import tqdm
 
 
@@ -8,20 +9,46 @@ class Bert:
     """Class for implementing the three BERT models"""
 
     def __init__(self, model_version='bhadresh-savani/bert-base-uncased-emotion'):
-
+        # First load the model with original number of classes
         self.model = BertForSequenceClassification.from_pretrained(model_version, output_attentions=True)
+        
+        # Update the model's configuration for 7 classes
+        self.model.config.num_labels = 7
+        
+        # Update the model's internal state for 7 classes
+        self.model.num_labels = 7
+        self.model.classifier = torch.nn.Linear(self.model.config.hidden_size, 7)
+        self.model.loss_fct = torch.nn.CrossEntropyLoss()
+        
+        # Move model to device
         self.model.to('cuda' if torch.cuda.is_available() else 'cpu')
 
     def fit(self, train_loader, epochs, lr, weight_decay=0.01, fine_tune_last_layers=False):
-
+        """Train the model with improved parameters"""
+        
+        # Only freeze BERT layers if fine-tuning last layers
         if fine_tune_last_layers:
             for param in self.model.bert.parameters():
                 param.requires_grad = False
 
-        # set up optimizer and scheduler
-        optimizer = AdamW(filter(lambda p: p.requires_grad, self.model.parameters()), lr=lr, weight_decay=weight_decay)
+        # Set up optimizer with improved parameters
+        optimizer = AdamW(
+            filter(lambda p: p.requires_grad, self.model.parameters()),
+            lr=lr,
+            weight_decay=weight_decay,
+            betas=(0.9, 0.999),
+            eps=1e-08
+        )
+        
+        # Calculate total steps for scheduler
         total_steps = len(train_loader) * epochs
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
+        
+        # Set up scheduler with warmup
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=total_steps // 10,  # 10% warmup
+            num_training_steps=total_steps
+        )
 
         for epoch in range(epochs):
             self.model.train()
@@ -35,6 +62,10 @@ class Bert:
                 loss = outputs.loss
                 total_loss += loss.item()
                 loss.backward()
+                
+                # Gradient clipping to prevent exploding gradients
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                
                 optimizer.step()
                 scheduler.step()
 
@@ -69,7 +100,8 @@ class DistilBert:
     """Class for implementing DistilBERT with identical structure to original BERT class"""
 
     def __init__(self, model_version='bhadresh-savani/distilbert-base-uncased-emotion'):
-        self.model = AutoModelForSequenceClassification.from_pretrained(model_version, output_attentions=True)
+        self.model = AutoModelForSequenceClassification.from_pretrained(model_version, output_attentions=True, num_labels=7)
+        self.model.classifier = torch.nn.Linear(self.model.config.hidden_size, 7)
         self.model.to('cuda' if torch.cuda.is_available() else 'cpu')
 
     def fit(self, train_loader, epochs, lr, weight_decay=0.01, fine_tune_last_layers=False):

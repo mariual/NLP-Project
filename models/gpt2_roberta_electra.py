@@ -25,6 +25,7 @@ class GPT2Emotion:
 
         # Charger le modèle et le tokenizer GPT-2 pour la classification
         self.model = GPT2ForSequenceClassification.from_pretrained(model_name, num_labels=num_labels)
+        self.model.classifier = torch.nn.Linear(self.model.config.hidden_size, 7)
         self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
 
         # Ajouter un token de padding si nécessaire (GPT-2 n'en a pas par défaut)
@@ -135,6 +136,7 @@ class Roberta:
 
     def __init__(self, model_name='Dimi-G/roberta-base-emotion'):
         self.model = RobertaForSequenceClassification.from_pretrained(model_name)
+        self.model.classifier = torch.nn.Linear(self.model.config.hidden_size, 7)
         self.tokenizer = RobertaTokenizer.from_pretrained(model_name)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
@@ -214,6 +216,7 @@ class Electra:
         self._set_seed()
 
         self.model = ElectraForSequenceClassification.from_pretrained(model_name)
+        self.model.classifier = torch.nn.Linear(self.model.config.hidden_size, 7)
         self.tokenizer = ElectraTokenizer.from_pretrained(model_name)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
